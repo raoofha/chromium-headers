@@ -1,0 +1,99 @@
+version: 2
+
+jobs:
+  build-cache:
+    docker:
+      - image: circleci/buildpack-deps:bionic
+      #- image: circleci/buildpack-deps:focal
+      #- image: circleci/buildpack-deps:trusty
+    steps:
+      - checkout
+      - run:
+          name: cache chromium
+          command: |
+            sudo apt-get install -y python-minimal lsb-release
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+            export PATH="$PATH:${PWD}/depot_tools"
+            mkdir chromium && cd chromium
+            fetch --no-history --nohooks chromium
+            cd src
+
+            git fetch --tags
+            git checkout 83.0.4103.116
+            #git fetch origin 8f0c18b4dca9b6699eb629be0f51810c24fb6428
+            #git checkout 8f0c18b4dca9b6699eb629be0f51810c24fb6428
+            gclient sync --with_branch_heads --with_tags
+
+            sudo ./build/install-build-deps.sh --no-arm
+            gclient runhooks
+      - save_cache:
+          paths:
+            - "depot_tools"
+            - "chromium"
+          key: v1-chromium-dependencies-{{ checksum ".circleci/config.yml" }}
+      - run:
+          name: build chromium
+          command: |
+            gn gen out/Default --enable_nacl=false
+            autoninja -j 4 -C out/Default chrome
+
+  build-static-bin:
+    machine: true
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-chromium-dependencies-{{ checksum ".circleci/config.yml" }}
+            #- v1-chromium-dependencies-youPysmiOvODHCVbpoYqozFBh2RRJrfPKAsRa3ILkjc=
+      - run:
+          name: compress outdir
+          command: |
+            cd ~/project/chromium/src/
+            FILES=`find . -name "*.h"`
+            mkdir -p /tmp/workspace/out
+            cd /tmp/workspace/out
+            tar cvJf chromium-headers-$CIRCLE_TAG-linux-x64.tar.xz -C ~/project/chromium/src -T <(echo $FILES)
+      - persist_to_workspace:
+          root: /tmp/workspace
+          paths:
+            - out/*
+
+  release:
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - checkout
+      - run:
+          name: add body and tars to github release
+          command: |
+            go get -u github.com/tcnksm/ghr
+            #START=$(echo $CIRCLE_TAG | cut -c2-)
+            #END='## \['
+            #BODY=$(sed -n "1,/$START/d;/$END/q;p" CHANGELOG.md)
+            #ghr -t $GITHUB_TOKEN -u $CIRCLE_PROJECT_USERNAME -r $CIRCLE_PROJECT_REPONAME -b "$BODY" --replace $CIRCLE_TAG /tmp/workspace/out
+            ghr -t $GITHUB_TOKEN -u $CIRCLE_PROJECT_USERNAME -r $CIRCLE_PROJECT_REPONAME -b "$CIRCLE_PROJECT_REPONAME $CIRCLE_TAG" --replace $CIRCLE_TAG /tmp/workspace/out
+
+workflows:
+  version: 2
+  build-test-release:
+    jobs:
+      - build-cache:
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+      - build-static-bin:
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: /.*/
+          requires:
+            - build-cache
+      - release:
+          requires:
+            - build-static-bin
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
