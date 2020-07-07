@@ -47,8 +47,11 @@ jobs:
       - run:
           name: build chromium
           command: |
+            sudo apt-get install -y python-minimal python2.7 lsb-release
             export PATH="$PATH:${PWD}/depot_tools"
             cd chromium/src
+            sudo ./build/install-build-deps.sh --no-arm
+            gclient runhooks
             gn gen out/Default --enable_nacl=false
             autoninja -j 4 -C out/Default chrome
       - run:
