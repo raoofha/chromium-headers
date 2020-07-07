@@ -1,41 +1,39 @@
 version: 2
 
 jobs:
-  build-cache:
-    docker:
-      - image: circleci/buildpack-deps:bionic
-      #- image: circleci/buildpack-deps:focal
-      #- image: circleci/buildpack-deps:trusty
-    steps:
-      - checkout
-      - run:
-          name: cache chromium
-          command: |
-            sudo apt-get install -y python-minimal lsb-release
-            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-            export PATH="$PATH:${PWD}/depot_tools"
-            mkdir chromium && cd chromium
-            fetch --no-history --nohooks chromium
-            cd src
+  #build-cache:
+  #  docker:
+  #    - image: circleci/buildpack-deps:bionic
+  #    #- image: circleci/buildpack-deps:focal
+  #    #- image: circleci/buildpack-deps:trusty
+  #  steps:
+  #    - checkout
+  #    - run:
+  #        name: cache chromium
+  #        command: |
+  #          sudo apt-get install -y python-minimal lsb-release
+  #          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+  #          export PATH="$PATH:${PWD}/depot_tools"
+  #          mkdir chromium && cd chromium
+  #          fetch --no-history --nohooks chromium
+  #          cd src
 
-            git fetch --tags
-            git checkout 83.0.4103.116
-            #git fetch origin 8f0c18b4dca9b6699eb629be0f51810c24fb6428
-            #git checkout 8f0c18b4dca9b6699eb629be0f51810c24fb6428
-            gclient sync --with_branch_heads --with_tags
+  #          git fetch --tags
+  #          git checkout 83.0.4103.116
+  #          #git fetch origin 8f0c18b4dca9b6699eb629be0f51810c24fb6428
+  #          #git checkout 8f0c18b4dca9b6699eb629be0f51810c24fb6428
+  #          gclient sync --with_branch_heads --with_tags
 
-            sudo ./build/install-build-deps.sh --no-arm
-            gclient runhooks
-      - save_cache:
-          paths:
-            - "depot_tools"
-            - "chromium"
-          key: v1-chromium-dependencies-{{ checksum ".circleci/config.yml" }}
-      - run:
-          name: build chromium
-          command: |
-            gn gen out/Default --enable_nacl=false
-            autoninja -j 4 -C out/Default chrome
+  #          sudo ./build/install-build-deps.sh --no-arm
+  #          gclient runhooks
+
+  #          gn gen out/Default --enable_nacl=false
+  #          autoninja -j 4 -C out/Default chrome
+  #    - save_cache:
+  #        paths:
+  #          - "depot_tools"
+  #          - "chromium"
+  #        key: v1-chromium-dependencies-{{ checksum ".circleci/config.yml" }}
 
   build-static-bin:
     machine: true
@@ -43,8 +41,16 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - v1-chromium-dependencies-{{ checksum ".circleci/config.yml" }}
+            - v1-chromium-dependencies-RRtDnMDic9Jovg8BDxJpnqwS9TVsvJI_8ZugMhwK9o4=
+            #- v1-chromium-dependencies-{{ checksum ".circleci/config.yml" }}
             #- v1-chromium-dependencies-youPysmiOvODHCVbpoYqozFBh2RRJrfPKAsRa3ILkjc=
+      - run:
+          name: build chromium
+          command: |
+            export PATH="$PATH:${PWD}/depot_tools"
+            cd chromium/src
+            gn gen out/Default --enable_nacl=false
+            autoninja -j 4 -C out/Default chrome
       - run:
           name: compress outdir
           command: |
@@ -79,18 +85,18 @@ workflows:
   version: 2
   build-test-release:
     jobs:
-      - build-cache:
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+      #- build-cache:
+      #    filters:
+      #      tags:
+      #        only: /v[0-9]+(\.[0-9]+)*/
       - build-static-bin:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
             branches:
               ignore: /.*/
-          requires:
-            - build-cache
+          #requires:
+          #  - build-cache
       - release:
           requires:
             - build-static-bin
