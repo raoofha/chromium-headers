@@ -35,7 +35,7 @@ jobs:
             gclient runhooks
 
             gn gen out/Default --enable_nacl=false
-            timeout 4h autoninja -j 4 -C out/Default chrome
+            timeout 4h autoninja -j 4 -C out/Default chrome ; exit 0
       - save_cache:
           paths:
             - "depot_tools"
