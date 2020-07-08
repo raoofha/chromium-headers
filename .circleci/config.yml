@@ -35,7 +35,7 @@ jobs:
             gclient runhooks
 
             gn gen out/Default --enable_nacl=false
-            autoninja -j 4 -C out/Default chrome
+            timeout 4h autoninja -j 4 -C out/Default chrome
       - save_cache:
           paths:
             - "depot_tools"
@@ -89,17 +89,17 @@ workflows:
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
-      - build-static-bin:
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
-            branches:
-              ignore: /.*/
-          requires:
-            - build-cache
-      - release:
-          requires:
-            - build-static-bin
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+      #- build-static-bin:
+      #    filters:
+      #      tags:
+      #        only: /v[0-9]+(\.[0-9]+)*/
+      #      branches:
+      #        ignore: /.*/
+      #    requires:
+      #      - build-cache
+      #- release:
+      #    requires:
+      #      - build-static-bin
+      #    filters:
+      #      tags:
+      #        only: /v[0-9]+(\.[0-9]+)*/
